@@ -1,0 +1,53 @@
+
+load(7,1);    //loads exception handler to memory
+load(8,1);
+load(23,17);  //loads interrupt 7 to memory
+load(24,18);
+
+
+load (9, 3);
+load (10, 4);//load timer interrupt
+
+[READY_LIST + 0] = 0; // Sets the entry for PID as 0 
+load(25,21); // Load 1st page of code from disk to memory
+load(26,22); // Load 2nd page of code from disk to memory
+load(27,23); // Load 3rd page of code from disk to memory
+PTBR=1024;
+PTLR=4;
+[PTBR + 0] = 25; // Physical Page Number for Logical Page 0
+[PTBR + 1] = "01"; // Auxiliary Information for Logical Page 0
+[PTBR + 2]= 26;
+[PTBR+ 3]= "01";
+[PTBR + 4]= 27;
+[PTBR + 5]="01";
+[PTBR + 6] = 28; // Physical Page Number for Logical Page 3 (Stack)
+[PTBR + 7] = "01"; // Auxiliary Information for Logical Page 3 (Stack)
+[READY_LIST + 1] = 2; // Sets the entry for STATE as Running 
+SP = 3 * 512; //set stack pointer to 
+ [28 * 512] = 0;//set IP value for init in stack---28 is the location of init's stack
+
+
+
+//.......2nd process....
+[READY_LIST + 32] = 1; // Sets the entry for PID as 1 multiprogramming
+load(29 , 25); //loads the 2nd program from disk to memory 
+alias PTBR_Process1 S0;
+PTBR_Process1 = 1024 + 1 * 8; //setting up page table for process 2
+[PTBR_Process1 + 0] = 29; // Physical Page Number for Logical Page 0 - only 1 page code
+[PTBR_Process1 + 1] = "01"; // Not referenced and Valid
+[PTBR_Process1 + 2] = -1; // Invalid Page Number for Logical Page 1
+[PTBR_Process1 + 3] = "00"; // Not referenced and Not Valid
+[PTBR_Process1 + 4] = -1; // Invalid Page Number for Logical Page 2
+[PTBR_Process1 + 5] = "00"; // Not referenced and Not Valid
+[PTBR_Process1 + 6] = 30; // Physical Page Number for Logical Page 3
+[PTBR_Process1 + 7] = "01"; // Not referenced and Valid
+
+[READY_LIST + 33]=1; //state is set as 1 for process
+[READY_LIST + 37] = PTBR_Process1; // PTBR
+[READY_LIST + 38] = 4; // PTLR 
+[READY_LIST + 34] = 3 * 512;//BP set to logical page 3
+[READY_LIST + 35] = 3* 512; //SP set to logical page 3
+[READY_LIST + 36] = 0 ;//IP set to 0
+//print "os Ends";
+ireturn;
+
