@@ -1,0 +1,97 @@
+
+  //WRITE
+  alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+//physical address of SP
+
+
+
+alias currentPCB S13;
+currentPCB = READY_LIST + 32 * (PTBR - 1024)/8;
+//...get value of PCB
+alias sysCallNo S1;
+sysCallNo = [physicalSP-1];
+//get system call no
+
+// Get arguments from stack and put it in registers
+
+alias filedescriptor S2;
+filedescriptor = [physicalSP-4];
+alias write S10;
+write = [physicalSP-3];
+alias counter S3;
+counter = 1;
+alias offset S4;
+offset = 0;
+alias index S7;
+index = 0;
+alias basic_block S8;
+alias data_block S9;
+alias sysindex S11;
+alias seekpos S12;
+
+counter = 0;
+offset = 0;
+if( sysCallNo == 5) then
+//invalid filedescriptor
+  if(filedescriptor < 0 || filedescriptor > 7) then
+  	[ physicalSP-2 ] = -1;
+  	ireturn;		
+  endif;
+
+  	//system wide open table index in per process open table
+    sysindex = [ currentPCB + 15 + 2 * filedescriptor ];
+	//seek position in pp open table
+    seekpos = [currentPCB + 15 + 2 * filedescriptor + 1];
+    //if invalid entry in pp open table 
+ if( sysindex  == -1 ) then
+   [ physicalSP-2 ] = -1;
+   ireturn;
+ endif;
+   
+    //get fat table index from system wide open table
+   index =  [ FILE_TABLE + 2 * sysindex];
+	
+   basic_block = [ FAT + 8 * index + 2 ];
+   load(1,basic_block);
+   index = seekpos / 512 + SCRATCHPAD;
+   
+   	//datablock not there
+   if([index ] == -1) then
+        counter = 23;
+       while( counter < 448) do
+	//find free datablock using diskfreelist
+       if( [DISK_LIST + counter] == 0) then
+       		[DISK_LIST + counter] = 1;
+      		break;
+       endif;
+       counter = counter + 1;
+       endwhile;
+   //no empty block
+   if(counter ==448) then
+   	[ physicalSP-2 ] = -1;  
+   	ireturn;
+   endif;
+	//add the data blockno in df list
+  [index ] = counter;
+  store(1,basic_block);
+  //fat index in fat table
+  offset =  [ FILE_TABLE + 2 * sysindex];
+  //file size increased 
+   [ FAT + 8 * offset + 1 ] = [ FAT + 8 * offset + 1 ] + 512;
+ store(5,19);
+ store(6,20);  
+ endif;
+ //data block no
+ data_block = [ index ];
+ load(1,data_block);
+ 
+ offset = seekpos % 512;
+ [ SCRATCHPAD + offset ] = write;
+ store(1,data_block);
+ [currentPCB + 15 + 2 * filedescriptor + 1] =  [currentPCB + 15 + 2 * filedescriptor + 1] + 1;
+ 
+  [ physicalSP-2 ] = 0;
+    ireturn;
+    endif;

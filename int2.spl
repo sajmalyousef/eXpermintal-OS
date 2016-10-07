@@ -7,15 +7,16 @@ physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 
 alias sysCallNo S1;
 sysCallNo=[physicalSP-1];
-alias filename S2;
-filename = [physicalSP-3];
-alias fatcount S3;
-fatcount=0;
-alias fatindex S4;
 
 if ( sysCallNo == 2) then
 	// Implementation of Open
 	//find if flename exists in fat entry
+	alias filename S2;
+	filename = [physicalSP-3];
+	alias fatcount S3;
+	fatcount=0;
+	alias fatindex S4;
+
 	while(fatcount <  512  ) do
 		if([FAT + fatcount] == filename) then
 			fatindex=fatcount/8;
@@ -30,13 +31,14 @@ if ( sysCallNo == 2) then
 	endif;
 	alias filecount S5; 	
 	filecount=0;
+	alias swfileindex S6;
 		//check if file entry in system wide open file table
 	while(filecount<128) do
 		//file already opened
 		if([FILE_TABLE + filecount]==fatindex) then 
 		 	swfileindex=filecount/2;
 			break;
-			
+		endif;	
 		if([FILE_TABLE +filecount] ==-1) then
 			swfileindex=filecount/2;
 			break;
@@ -53,7 +55,7 @@ if ( sysCallNo == 2) then
 	alias currentPCB S7;
 	
 	currentPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
-	alias count S6;
+	alias count S9;
 	
 	count=15;
 	//search per process open file table of current process
@@ -72,43 +74,41 @@ if ( sysCallNo == 2) then
 	endif;
 	if([swfileindex*2 + FILE_TABLE] ==-1) then
 		[swfileindex*2 + FILE_TABLE]=fatindex;
-		[swfileindex*2 + FILE_TABLE + 1 ]=1
+		[swfileindex*2 + FILE_TABLE + 1 ]=1;
 	else
 		
 		[swfileindex*2 + FILE_TABLE + 1] = [swfileindex*2 + FILE_TABLE + 1] + 1;
-	endif
+	endif;
 	
 	[physicalSP - 2]= (count - 15 )/2;
 	ireturn;
 endif;
 
-alias filedescriptor S2;
-if(syscallNo==3) then
-	 if([filedescriptor]<0||[filedescriptor]>=7) then
+
+if(sysCallNo==3) then
+	 alias filedescriptor S2;
+	 filedescriptor = [physicalSP - 3];
+	 if(filedescriptor<0||filedescriptor>7) then
   		[physicalSP-2]=-1;
   		ireturn;
   	endif;
 	alias currentPCB S3;
 	currentPCB = READY_LIST + 32 *((PTBR-1024)/8);
 	alias pointer S4;
-	pointer=[currentPCB + 15 + filedescriptor * 2]
-	if([pointer] ==-1) then
+	pointer=[currentPCB + 15 + filedescriptor * 2];
+	if(pointer ==-1) then
 		[physicalSP -2] =-1;
 		ireturn;
 	endif;
-	[FILE_TABLE + [pointer]*2 + 1] = [FILE_TABLE + [pointer]*2 + 1] -1;
-	if([FILE_TABLE + [pointer]*2 + 1]==0)
-		[FILE_TABLE + [pointer]*2 + 1] = -1;
-		[FILE_TABLE + [pointer]*2 + 1] = -1;
-		[pointer]=-1;
-		[pointer +1] = -1;
+	[FILE_TABLE + pointer*2 + 1] = [FILE_TABLE + pointer*2 + 1] -1;
+	if([FILE_TABLE + pointer*2 + 1]==0) then
+		[FILE_TABLE + pointer*2 ] = -1;
 	endif;
+	
+	[currentPCB + 15 + filedescriptor * 2]=-1;
+	[currentPCB + 15 + filedescriptor * 2 + 1]=-1;
+		
+	
 	[physicalSP-2]=0;
     	ireturn;
 endif;
-	
-	
-		
-	
-
-`

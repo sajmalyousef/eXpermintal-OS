@@ -1,0 +1,105 @@
+
+
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+
+alias syscallno S1;
+alias value S2;
+alias seek S3;
+alias filedescriptor S4;
+alias count S5;
+alias pindex S6;
+alias currentPCB S7;
+alias sindex S8;
+alias fatentry S9;
+alias PID S10;
+alias seekvalue S11;
+
+//we reduce by 1 because in memory address or values take one word
+
+syscallno=[physicalSP-1];
+
+
+	//arguments
+	filedescriptor=[physicalSP-4]; //file descriptor
+	seekvalue=[physicalSP-3];	//seekvalue
+
+if( syscallno == 6) then
+	 
+    if(filedescriptor<0 || filedescriptor>7) then
+    	[physicalSP-2]=-1;
+        ireturn;
+    endif;
+
+    //get PID,then from PCB load the value of file descriptor
+
+    PID= (PTBR-1024)/8;
+    currentPCB=  READY_LIST+PID*32;
+    pindex=currentPCB+15+2*filedescriptor;
+	//value in per process is -1
+    if([pindex]==-1) then
+    	[physicalSP-2]=-1;
+    	ireturn;
+    endif;
+    //get the system wide open table index
+    sindex =FILE_TABLE + [pindex ] * 2;
+    
+    
+    fatentry =	FAT + [sindex] * 8;
+	//seekvalue should be smaller than size of file
+    if(seekvalue <0 || seekvalue >= [fatentry + 1]) then
+	[physicalSP-2] = -1;
+	ireturn;
+    endif;
+    [pindex + 1] = seekvalue;
+    [physicalSP - 2] = 0;
+    
+    ireturn;
+endif;
+
+
+if( syscallno == 7) then
+	if(filedescriptor<0 || filedescriptor>7) then
+    		[physicalSP-2]=-1;
+        	ireturn;
+    	endif;
+
+    //get PID,then from PCB load the value of file descriptor
+
+    	PID= (PTBR-1024)/8;
+    	currentPCB=  READY_LIST+PID*32;
+    	pindex=currentPCB+15+2*filedescriptor;
+    	if([pindex]==-1) then
+    		[physicalSP-2]=-1;
+    		ireturn;
+    	endif;
+    	sindex =FILE_TABLE + [pindex ] * 2;
+    	seek = [pindex + 1];
+    	fatentry =	FAT + [sindex] * 8;
+    	if(seek <0 || seek>= [fatentry + 1]) then
+		[physicalSP-2] = -1;
+		ireturn;
+    	endif;
+	load ( 1, [fatentry + 2]);
+	currentPCB=seek/512+SCRATCHPAD;
+    	if([currentPCB]==-1) then
+        	[physicalSP-2]=-1;
+        	ireturn;
+    	endif;
+
+    	load(1,[currentPCB]);
+    	value=[SCRATCHPAD+seek%512];
+    	[physicalSP-3]=value;
+
+    	[pindex+1]=[pindex+1]+1;
+
+    	[physicalSP-2]=0;
+	//print("READ COMPLETE");
+    	ireturn;
+endif;
+	
+
