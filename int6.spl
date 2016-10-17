@@ -1,0 +1,178 @@
+alias physicalSP S10;
+physicalSP = [PTBR + 2*(SP/512)] * 512 + (SP % 512);
+
+alias syscallno S1;
+
+alias filename S2;
+syscallno = [physicalSP -1];
+filename = [physicalSP-3];
+
+
+alias PCB S5;
+
+if(syscallno == 9) then
+//exec() 
+
+
+//search filename in FAT
+
+alias fatcount S3;
+
+fatcount = 0;
+
+
+alias fatindex S4;
+
+
+while(fatcount <  512  ) do
+		if([FAT + fatcount] == filename) then
+			fatindex=fatcount/8;
+			break;	
+		endif;
+		fatcount=fatcount+8;
+endwhile;
+	//return -1 if it does not exist
+if(fatcount==512) then
+	[physicalSP-2]=-1;
+	print("filename not found");
+	ireturn;
+endif;
+
+
+alias count S5;
+count = 0;
+
+
+// number of code blocks
+count=[FAT +fatcount + 1]/512;
+load ( 1, [FAT + fatcount + 2]);
+
+
+//maximum 3 possible blocks
+if(count > 3) then
+[physicalSP - 2]=-1;
+print("exceeds limit");
+ireturn;
+endif;
+
+
+alias i S6; 
+i=0;
+alias pagecount S7;
+// number of valid pages
+pagecount = 0;
+
+while (i < 3) do
+	if([PTBR + i * 2 + 1] == "01" || [PTBR + i * 2 + 1 ] == "11") then
+
+			pagecount =pagecount + 1;
+	endif;
+	
+	i =i + 1;
+endwhile;
+	
+
+if(pagecount > count) then
+	while(count != pagecount) do
+		pagecount = pagecount -1;
+		[ PTBR + pagecount * 2 + 1] = "00";
+		[PTBR + pagecount * 2 ] = -1;
+	endwhile;
+endif;
+//check if there is enough page
+alias counter S8;
+if ( count > pagecount) then
+	i= count - pagecount;
+	counter = 0;
+	while(counter<64 && i > 0) do
+		if([MEM_LIST + counter] == 0) then
+			i = i-1;
+		endif;
+			counter = counter+1;
+		endwhile;
+
+		if(i!= 0) then
+			[physicalSP - 2] = -1;
+			ireturn;
+		endif;
+
+
+		i = count - pagecount;
+		while( counter<64 && i>0) do
+		
+			if ([MEM_LIST + counter] != 0) then	
+			// block already used
+				counter = counter + 1;
+				continue;
+			endif;
+			
+			// unused block, allocate
+			
+			[MEM_LIST + counter] = 1;
+			[PTBR + (count - i) * 2] = counter;
+			[PTBR + (count - i) * 2 + 1] = "01";
+			
+			i = i - 1;
+			counter = counter + 1;
+			
+		endwhile;
+		
+endif;
+
+counter = 0;
+	while (counter < count) do
+		load([PTBR + counter * 2], [SCRATCHPAD + counter]);
+		counter = counter + 1;
+	endwhile;
+
+
+	
+
+
+
+
+
+
+counter = 15;
+
+PCB = READY_LIST + (PTBR-1024)*4;  
+
+while(counter < 31) do
+	if([PCB + counter]!=-1) then
+		
+		
+		[FILE_TABLE + [PCB + counter]*2 + 1] = [FILE_TABLE + [PCB + counter]*2 + 1]-1;
+		
+		if([FILE_TABLE + [PCB + counter]*2 + 1]==0) then
+			[FILE_TABLE + [PCB + counter]*2] = -1;
+		endif;
+		
+		[PCB+counter] = -1;
+		[PCB+counter + 1] = -1;
+		
+	endif;
+	counter = counter + 2;
+endwhile;
+
+[physicalSP - 2] = 1;
+SP = 3*512;
+physicalSP = ([PTBR + 2*(SP/512)]*512 + (SP)%512);
+print([PTBR + 2*(SP/512)]);
+breakpoint;
+[physicalSP] = 0;
+ireturn;
+
+
+endif;
+
+
+if(syscallno == 11) then
+	[physicalSP -2] = [PCB];
+	ireturn;
+endif;
+
+
+if( syscallno ==12) then
+	[physicalSP -2] =[PCB + 31];
+	ireturn;
+endif;
